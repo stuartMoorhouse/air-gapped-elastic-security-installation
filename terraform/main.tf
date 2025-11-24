@@ -94,9 +94,15 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Route Table for Private Subnet (no internet route - air-gapped)
+# Route Table for Private Subnet (needs IGW route for inbound SSH access)
+# Air-gapped behavior is enforced via security group egress rules
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
 
   tags = {
     Name = "${var.project_name}-private-rt"
@@ -208,6 +214,15 @@ resource "aws_security_group" "airgapped" {
     to_port     = 0
     protocol    = "-1"
     self        = true
+  }
+
+  # SSH from staging security group (for bundle transfer from VM0)
+  ingress {
+    description     = "SSH from staging for bundle transfer"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.staging.id]
   }
 
   # No internet egress (air-gapped)
@@ -326,7 +341,7 @@ resource "aws_instance" "vm3_fleet" {
   }
 }
 
-# Transfer bundle from VM0 to air-gapped VMs and wait for setup completion
+# Transfer bundle from VM0 to air-gapped VMs using VM0's internal network access
 resource "null_resource" "transfer_bundle" {
   depends_on = [
     aws_instance.vm0_staging,
@@ -336,37 +351,39 @@ resource "null_resource" "transfer_bundle" {
     local_file.private_key
   ]
 
-  # Transfer bundle to VM1
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Transferring bundle to VM1..."
-      scp -i ${local_file.private_key.filename} -o StrictHostKeyChecking=no \
-        ubuntu@${aws_instance.vm0_staging.public_ip}:/home/ubuntu/airgap-bundle.tar \
-        ubuntu@${aws_instance.vm1_registries.public_ip}:/home/ubuntu/
-    EOT
+  connection {
+    type        = "ssh"
+    user        = "ubuntu"
+    private_key = tls_private_key.ssh.private_key_pem
+    host        = aws_instance.vm0_staging.public_ip
   }
 
-  # Transfer bundle to VM2
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Transferring bundle to VM2..."
-      scp -i ${local_file.private_key.filename} -o StrictHostKeyChecking=no \
-        ubuntu@${aws_instance.vm0_staging.public_ip}:/home/ubuntu/airgap-bundle.tar \
-        ubuntu@${aws_instance.vm2_elastic.public_ip}:/home/ubuntu/
-    EOT
+  # Copy SSH key to VM0 so it can access other VMs
+  provisioner "file" {
+    content     = tls_private_key.ssh.private_key_pem
+    destination = "/home/ubuntu/.ssh/transfer_key.pem"
   }
 
-  # Transfer bundle to VM3
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Transferring bundle to VM3..."
-      scp -i ${local_file.private_key.filename} -o StrictHostKeyChecking=no \
-        ubuntu@${aws_instance.vm0_staging.public_ip}:/home/ubuntu/airgap-bundle.tar \
-        ubuntu@${aws_instance.vm3_fleet.public_ip}:/home/ubuntu/
-    EOT
+  # Transfer bundle directly from VM0 to VM1, VM2, VM3 using private IPs
+  provisioner "remote-exec" {
+    inline = [
+      "chmod 600 /home/ubuntu/.ssh/transfer_key.pem",
+      "echo 'Transferring bundle to VM1 (${aws_instance.vm1_registries.private_ip})...'",
+      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/airgap-bundle.tar ubuntu@${aws_instance.vm1_registries.private_ip}:/home/ubuntu/",
+      "echo 'Transferring bundle to VM2 (${aws_instance.vm2_elastic.private_ip})...'",
+      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/airgap-bundle.tar ubuntu@${aws_instance.vm2_elastic.private_ip}:/home/ubuntu/",
+      "echo 'Transferring bundle to VM3 (${aws_instance.vm3_fleet.private_ip})...'",
+      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/airgap-bundle.tar ubuntu@${aws_instance.vm3_fleet.private_ip}:/home/ubuntu/",
+      "echo 'All transfers complete!'",
+      "rm /home/ubuntu/.ssh/transfer_key.pem"
+    ]
   }
+}
 
-  # Wait for VM1 setup to complete
+# Wait for VM1 setup to complete
+resource "null_resource" "wait_vm1" {
+  depends_on = [null_resource.transfer_bundle]
+
   connection {
     type        = "ssh"
     user        = "ubuntu"
