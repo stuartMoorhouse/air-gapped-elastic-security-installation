@@ -6,7 +6,7 @@ Complete Command-by-Command Instructions
 
 ## Overview
 
-This guide provides instructions in how to deploy Elastic Security with Elastic Agent and self-managed Fleet Server in an air-gapped environment. As an example, a test deployment using AWS EC2 instances is provided.  
+This guide provides instructions in how to deploy Elastic Security with Elastic Agent and self-managed Fleet Server in an air-gapped environment. As an example, a test deployment using AWS EC2 instances is provided.
 
 ---
 
@@ -16,10 +16,10 @@ You need **FOUR** separate VMs to complete this deployment. VM0 is used to downl
 
 | VM Name | Purpose | Instance Type | Storage | Internet | Ports |
 |---------|---------|---------------|---------|----------|-------|
-| **VM0: Staging** | Download files, transfer to air-gap | t3.medium | 100GB gp3 | ✅ **YES** | 22 |
-| VM1: Registries | Package Registry, Artifact Registry | t3.medium | 100GB gp3 | ❌ **NO** | 22, 8080, 8081 |
-| VM2: Elastic Stack | Elasticsearch, Kibana | t3.large | 50GB gp3 | ❌ **NO** | 22, 9200, 5601 |
-| VM3: Fleet Server | Fleet Server, Test Agent | t3.medium | 30GB gp3 | ❌ **NO** | 22, 8220 |
+| **VM0: Staging** | Download files, transfer to air-gap | t3.medium | 100GB gp3 | YES | 22 |
+| VM1: Registries | Package Registry, Artifact Registry | t3.medium | 100GB gp3 | NO | 22, 8080, 8081 |
+| VM2: Elastic Stack | Elasticsearch, Kibana | t3.large | 50GB gp3 | NO | 22, 9200, 5601 |
+| VM3: Fleet Server | Fleet Server, Test Agent | t3.medium | 30GB gp3 | NO | 22, 8220 |
 
 **Important:** All VMs should use Ubuntu 24.04 LTS. VM0 needs full internet access. VM1, VM2, and VM3 should have NO internet access (simulating the air-gapped environment). In AWS testing, you can simulate this by not attaching an Internet Gateway to their subnet, or by using restrictive Security Groups.
 
@@ -40,7 +40,62 @@ Create a Security Group with these inbound rules:
 
 ---
 
+# STEP 0: Automated Setup with Terraform (Optional)
+
+> **Skip this step** if you are manually provisioning VMs or deploying in a real air-gapped environment. Proceed directly to Part A.
+
+For AWS testing, Terraform can automate infrastructure provisioning and file staging. When `terraform apply` completes, skip to **Part C Step 3**.
+
+## What Terraform Automates
+
+| Step | Description |
+|------|-------------|
+| Infrastructure | VMs, VPC, Security Groups, SSH key pair |
+| Part A (all steps) | Install Docker on VM0, download files, create archive |
+| Part B | Transfer bundle to VM1, VM2, VM3 |
+| Part C Steps 1-2 | Extract archive on VM1, install Docker |
+| Part D Step 1 | Extract archive on VM2 |
+| Part F Step 1 | Extract archive on VM3 |
+
+## Prerequisites
+
+- AWS credentials in environment (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+- `MY_IP` environment variable set to your public IP address
+
+## Run Terraform
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Optionally edit terraform.tfvars to customize settings
+
+terraform init
+terraform apply --auto-approve
+```
+
+Terraform will:
+1. Generate an SSH key pair (saved to `../state/elastic-airgap-key.pem`)
+2. Create all infrastructure (VMs, VPC, security groups)
+3. Wait for VM0 to download all files (~15-20 minutes)
+4. Transfer the bundle to VM1, VM2, VM3
+5. Wait for all VMs to extract and set up
+
+## After Terraform Completes
+
+The output will show SSH commands and IP addresses. Use these to connect to VMs:
+
+```bash
+# Example output
+ssh -i ../state/elastic-airgap-key.pem ubuntu@<VM1_IP>
+```
+
+**Skip to Part C Step 3** to continue with manual configuration.
+
+---
+
 # PART A: Download Files on Internet-Connected VM
+
+> **If you completed Step 0:** Skip this entire section. Proceed to Part C Step 3.
 
 SSH into VM0 (the staging server with internet access) and run all commands in this section. This VM downloads everything needed for the air-gapped deployment.
 
@@ -276,6 +331,8 @@ ls -lh airgap-bundle.tar
 
 # PART B: Transfer Files to Air-Gapped VMs
 
+> **If you completed Step 0:** Skip this entire section. Proceed to Part C Step 3.
+
 Transfer the downloaded files from VM0 to the air-gapped VMs. In a real air-gapped environment, you would use a USB drive or approved file transfer mechanism. For AWS testing, we use SCP.
 
 ## Option 1: Using SCP (for AWS Testing)
@@ -328,6 +385,8 @@ In a true air-gapped environment:
 # PART C: VM1 - Registries Server Setup (Air-Gapped)
 
 SSH into VM1 and run all commands in this section. This VM has NO internet access.
+
+> **If you completed Step 0:** Skip to Step 3. Steps 1-2 were automated.
 
 ## Step 1: Extract the Transfer Archive
 
@@ -500,6 +559,8 @@ hostname -I | awk '{print $1}'
 
 SSH into VM2 and run all commands in this section. This VM has NO internet access.
 
+> **If you completed Step 0:** Skip to Step 2. Step 1 was automated.
+
 ## Step 1: Extract the Transfer Archive
 
 ```bash
@@ -645,6 +706,8 @@ These steps are performed in the Kibana web interface.
 # PART F: VM3 - Fleet Server Setup (Air-Gapped)
 
 SSH into VM3 and run all commands in this section. This VM has NO internet access.
+
+> **If you completed Step 0:** Skip to Step 2. Step 1 was automated.
 
 ## Step 1: Extract the Transfer Archive
 

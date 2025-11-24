@@ -1,0 +1,23 @@
+# AWS Region (Stockholm)
+aws_region = "eu-north-1"
+
+# Project name for resource naming
+project_name = "elastic-airgap"
+
+# VPC CIDR blocks
+vpc_cidr            = "10.0.0.0/16"
+public_subnet_cidr  = "10.0.1.0/24"
+private_subnet_cidr = "10.0.2.0/24"
+
+# Your IP address for SSH and Kibana access
+# If not set, uses MY_IP environment variable from ~/.zshrc
+# allowed_ssh_cidr = "1.2.3.4/32"
+
+# Name for the auto-generated SSH key pair (optional, has default)
+# key_name = "elastic-airgap-key"
+
+# Ubuntu AMI (leave empty for automatic lookup of Ubuntu 24.04 LTS)
+ubuntu_ami = ""
+
+# Elastic Stack version
+elastic_version = "9.2.0"
