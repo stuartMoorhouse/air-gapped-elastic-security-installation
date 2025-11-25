@@ -10,16 +10,16 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 echo "=== VM2 Setup Started at $(date) ==="
 
 # Wait for bundle to arrive from VM0
-echo "=== Waiting for airgap-bundle.tar ==="
-while [ ! -f /home/ubuntu/airgap-bundle.tar ]; do
+echo "=== Waiting for vm2-bundle.tar ==="
+while [ ! -f /home/ubuntu/vm2-bundle.tar ]; do
     echo "Waiting for bundle... ($(date))"
     sleep 30
 done
 
 echo "=== Bundle received, extracting ==="
 cd /home/ubuntu
-tar -xvf airgap-bundle.tar
-chown -R ubuntu:ubuntu airgap-files/
+tar -xvf vm2-bundle.tar
+chown -R ubuntu:ubuntu /home/ubuntu/
 
 echo "=== VM2 Setup Completed at $(date) ==="
 echo "Bundle extracted. Ready for Elasticsearch and Kibana installation."

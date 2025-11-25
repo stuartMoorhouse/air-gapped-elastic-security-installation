@@ -329,7 +329,7 @@ resource "aws_instance" "vm3_fleet" {
   vpc_security_group_ids = [aws_security_group.airgapped.id]
 
   root_block_device {
-    volume_size = 30
+    volume_size = 50
     volume_type = "gp3"
   }
 
@@ -364,16 +364,16 @@ resource "null_resource" "transfer_bundle" {
     destination = "/home/ubuntu/.ssh/transfer_key.pem"
   }
 
-  # Transfer bundle directly from VM0 to VM1, VM2, VM3 using private IPs
+  # Transfer VM-specific bundles from VM0 to VM1, VM2, VM3 using private IPs
   provisioner "remote-exec" {
     inline = [
       "chmod 600 /home/ubuntu/.ssh/transfer_key.pem",
-      "echo 'Transferring bundle to VM1 (${aws_instance.vm1_registries.private_ip})...'",
-      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/airgap-bundle.tar ubuntu@${aws_instance.vm1_registries.private_ip}:/home/ubuntu/",
-      "echo 'Transferring bundle to VM2 (${aws_instance.vm2_elastic.private_ip})...'",
-      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/airgap-bundle.tar ubuntu@${aws_instance.vm2_elastic.private_ip}:/home/ubuntu/",
-      "echo 'Transferring bundle to VM3 (${aws_instance.vm3_fleet.private_ip})...'",
-      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/airgap-bundle.tar ubuntu@${aws_instance.vm3_fleet.private_ip}:/home/ubuntu/",
+      "echo 'Transferring vm1-bundle.tar to VM1 (${aws_instance.vm1_registries.private_ip})...'",
+      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/vm1-bundle.tar ubuntu@${aws_instance.vm1_registries.private_ip}:/home/ubuntu/",
+      "echo 'Transferring vm2-bundle.tar to VM2 (${aws_instance.vm2_elastic.private_ip})...'",
+      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/vm2-bundle.tar ubuntu@${aws_instance.vm2_elastic.private_ip}:/home/ubuntu/",
+      "echo 'Transferring vm3-bundle.tar to VM3 (${aws_instance.vm3_fleet.private_ip})...'",
+      "scp -i /home/ubuntu/.ssh/transfer_key.pem -o StrictHostKeyChecking=no /home/ubuntu/vm3-bundle.tar ubuntu@${aws_instance.vm3_fleet.private_ip}:/home/ubuntu/",
       "echo 'All transfers complete!'",
       "rm /home/ubuntu/.ssh/transfer_key.pem"
     ]

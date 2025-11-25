@@ -312,22 +312,37 @@ ls -lhR
 
 You should see the Docker image tar file, the downloads directory with artifacts, and the .deb packages.
 
-## Step 10: Create Archive for Transfer
+## Step 10: Create VM-Specific Archives for Transfer
 
-Create a single archive of all files for easier transfer:
+Create separate archives for each VM to minimize transfer sizes:
+
+**VM1 bundle (Registries - Package Registry + Artifact Registry):**
+
+```bash
+cd ~/airgap-files
+```
+
+```bash
+tar -cvf ~/vm1-bundle.tar package-registry-9.2.0.tar downloads/ docker-debs/ nginx*.deb libnginx*.deb
+```
+
+**VM2 bundle (Elastic Stack - Elasticsearch + Kibana only):**
+
+```bash
+tar -cvf ~/vm2-bundle.tar elasticsearch-9.2.0-amd64.deb elasticsearch-9.2.0-amd64.deb.sha512 kibana-9.2.0-amd64.deb kibana-9.2.0-amd64.deb.sha512
+```
+
+**VM3 bundle (Fleet Server - Elastic Agent only):**
+
+```bash
+tar -cvf ~/vm3-bundle.tar downloads/beats/elastic-agent/
+```
+
+Check the sizes:
 
 ```bash
 cd ~
-```
-
-```bash
-tar -cvf airgap-bundle.tar airgap-files/
-```
-
-Check the size of the archive:
-
-```bash
-ls -lh airgap-bundle.tar
+ls -lh vm1-bundle.tar vm2-bundle.tar vm3-bundle.tar
 ```
 
 ---
@@ -345,19 +360,19 @@ From your local machine (not VM0), run these commands. Replace the IP addresses 
 **Transfer to VM1 (Registries):**
 
 ```bash
-scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/airgap-bundle.tar ubuntu@VM1_PUBLIC_IP:~/
+scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/vm1-bundle.tar ubuntu@VM1_PUBLIC_IP:~/
 ```
 
 **Transfer to VM2 (Elastic Stack):**
 
 ```bash
-scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/airgap-bundle.tar ubuntu@VM2_PUBLIC_IP:~/
+scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/vm2-bundle.tar ubuntu@VM2_PUBLIC_IP:~/
 ```
 
 **Transfer to VM3 (Fleet Server):**
 
 ```bash
-scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/airgap-bundle.tar ubuntu@VM3_PUBLIC_IP:~/
+scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/vm3-bundle.tar ubuntu@VM3_PUBLIC_IP:~/
 ```
 
 ## Option 2: Using Intermediate Download (Alternative)
@@ -366,12 +381,14 @@ If direct SCP between VMs is not possible, download to your local machine first,
 
 ```bash
 # Download from VM0 to local machine
-scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/airgap-bundle.tar .
+scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/vm1-bundle.tar .
+scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/vm2-bundle.tar .
+scp -i your-key.pem ubuntu@VM0_PUBLIC_IP:~/vm3-bundle.tar .
 
 # Upload to each air-gapped VM
-scp -i your-key.pem airgap-bundle.tar ubuntu@VM1_PUBLIC_IP:~/
-scp -i your-key.pem airgap-bundle.tar ubuntu@VM2_PUBLIC_IP:~/
-scp -i your-key.pem airgap-bundle.tar ubuntu@VM3_PUBLIC_IP:~/
+scp -i your-key.pem vm1-bundle.tar ubuntu@VM1_PUBLIC_IP:~/
+scp -i your-key.pem vm2-bundle.tar ubuntu@VM2_PUBLIC_IP:~/
+scp -i your-key.pem vm3-bundle.tar ubuntu@VM3_PUBLIC_IP:~/
 ```
 
 ## Option 3: Real Air-Gapped Environment (Production)
@@ -398,13 +415,13 @@ cd ~
 ```
 
 ```bash
-tar -xvf airgap-bundle.tar
+tar -xvf vm1-bundle.tar
 ```
 
 ## Step 2: Install Docker from Local .deb Files
 
 ```bash
-cd ~/airgap-files/docker-debs
+cd ~/docker-debs
 ```
 
 ```bash
@@ -430,7 +447,7 @@ newgrp docker
 ## Step 3: Load the Package Registry Docker Image
 
 ```bash
-cd ~/airgap-files
+cd ~
 ```
 
 ```bash
@@ -466,7 +483,7 @@ curl http://localhost:8080/health
 ## Step 5: Install Nginx from Local .deb Files
 
 ```bash
-cd ~/airgap-files
+cd ~
 ```
 
 ```bash
@@ -486,7 +503,7 @@ sudo mkdir -p /var/www/artifacts/downloads
 ```
 
 ```bash
-sudo cp -r ~/airgap-files/downloads/* /var/www/artifacts/downloads/
+sudo cp -r ~/downloads/* /var/www/artifacts/downloads/
 ```
 
 ```bash
@@ -502,7 +519,7 @@ sudo chmod -R 755 /var/www/artifacts
 Create the Nginx configuration file:
 
 ```bash
-sudo nano /etc/nginx/sites-available/artifacts
+sudo vim /etc/nginx/sites-available/artifacts
 ```
 
 Paste the following content:
@@ -571,14 +588,10 @@ cd ~
 ```
 
 ```bash
-tar -xvf airgap-bundle.tar
+tar -xvf vm2-bundle.tar
 ```
 
 ## Step 2: Verify SHA512 Checksums
-
-```bash
-cd ~/airgap-files
-```
 
 ```bash
 sha512sum -c elasticsearch-9.2.0-amd64.deb.sha512
@@ -629,7 +642,7 @@ sudo dpkg -i kibana-9.2.0-amd64.deb
 Edit the Kibana configuration file:
 
 ```bash
-sudo nano /etc/kibana/kibana.yml
+sudo vim /etc/kibana/kibana.yml
 ```
 
 Add these lines at the end (replace `VM1_PRIVATE_IP` and `VM2_PUBLIC_IP` with actual values):
@@ -639,7 +652,10 @@ server.host: "0.0.0.0"
 server.publicBaseUrl: "http://VM2_PUBLIC_IP:5601"
 xpack.fleet.registryUrl: "http://VM1_PRIVATE_IP:8080"
 xpack.fleet.isAirGapped: true
+xpack.encryptedSavedObjects.encryptionKey: "something_at_least_32_characters_long"
 ```
+
+> **Note:** The `encryptionKey` must be at least 32 characters. Generate a random string or use a password generator. This key is required for Fleet to store API keys securely.
 
 Save and exit: Press `Ctrl+X`, then `Y`, then `Enter`.
 
@@ -719,13 +735,13 @@ cd ~
 ```
 
 ```bash
-tar -xvf airgap-bundle.tar
+tar -xvf vm3-bundle.tar
 ```
 
 ## Step 2: Extract Elastic Agent
 
 ```bash
-cd ~/airgap-files/downloads/beats/elastic-agent
+cd ~/downloads/beats/elastic-agent
 ```
 
 ```bash
@@ -758,17 +774,48 @@ SSH to VM2 and run:
 sudo /usr/share/elasticsearch/bin/elasticsearch-service-tokens create elastic/fleet-server fleet-server-token
 ```
 
-**Copy the token value. You will need it in Step 6.**
+Fix the file permissions (required for Elasticsearch to read the token file):
+
+```bash
+sudo chown elasticsearch:elasticsearch /etc/elasticsearch/service_tokens
+sudo chmod 640 /etc/elasticsearch/service_tokens
+```
+
+Restart Elasticsearch and Kibana to load the new token:
+
+```bash
+sudo systemctl restart elasticsearch
+```
+
+Wait for Elasticsearch to start (about 30-60 seconds):
+
+```bash
+sudo systemctl status elasticsearch
+```
+
+Then restart Kibana:
+
+```bash
+sudo systemctl restart kibana
+```
+
+**Copy the token value from the create command output. You will need it in Step 6.**
 
 ## Step 5: Copy Elasticsearch CA Certificate
 
-On VM2, display the certificate:
+On VM2, display the certificate and its fingerprint:
 
 ```bash
 sudo cat /etc/elasticsearch/certs/http_ca.crt
 ```
 
-Copy the entire output (including BEGIN and END lines). On VM3:
+```bash
+sudo openssl x509 -in /etc/elasticsearch/certs/http_ca.crt -noout -fingerprint
+```
+
+**Write down the fingerprint (e.g., `SHA1 Fingerprint=12:88:CC:...`). You will use it to verify the certificate was copied correctly.**
+
+Copy the entire certificate output (including `-----BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----` lines). On VM3:
 
 ```bash
 sudo mkdir -p /etc/fleet-server/certs
@@ -780,26 +827,47 @@ sudo nano /etc/fleet-server/certs/ca.crt
 
 Paste the certificate, save and exit.
 
-## Step 6: Install Fleet Server
+Verify the certificate was copied correctly by checking the fingerprint matches:
+
+```bash
+sudo openssl x509 -in /etc/fleet-server/certs/ca.crt -noout -fingerprint
+```
+
+> **Important:** The fingerprint must match exactly. If it doesn't, the certificate was not copied correctly and Fleet Server will fail to connect with a "certificate signed by unknown authority" error.
+
+## Step 6: Get the Fleet Server Policy ID
+
+The `--fleet-server-policy` parameter requires the **policy ID**, not the policy name.
+
+To find the policy ID:
+1. In Kibana, go to Fleet > Agent policies
+2. Click on "Fleet Server Policy"
+3. Look at the URL in your browser - it will show something like:
+   `http://your-kibana:5601/app/fleet/policies/abc123-def456-789/...`
+4. The policy ID is the UUID after `/policies/` (e.g., `abc123-def456-789`)
+
+## Step 7: Install Fleet Server
 
 On VM3, run (replace placeholders with actual values):
 
 ```bash
-cd ~/airgap-files/downloads/beats/elastic-agent/elastic-agent-9.2.0-linux-x86_64
+cd ~/downloads/beats/elastic-agent/elastic-agent-9.2.0-linux-x86_64
 ```
 
 ```bash
 sudo ./elastic-agent install \
   --fleet-server-es=https://VM2_PRIVATE_IP:9200 \
   --fleet-server-service-token=YOUR_SERVICE_TOKEN \
-  --fleet-server-policy=fleet-server-policy \
+  --fleet-server-policy=YOUR_POLICY_ID \
   --fleet-server-es-ca=/etc/fleet-server/certs/ca.crt \
   --fleet-server-port=8220
 ```
 
+> **Important:** Use the policy ID (UUID) from Step 6, not the policy name. Using the policy name (e.g., "Fleet Server Policy" or "fleet-server-policy") will cause the installation to fail with a timeout error.
+
 Type 'y' when prompted.
 
-## Step 7: Verify Fleet Server
+## Step 8: Verify Fleet Server
 
 ```bash
 sudo elastic-agent status
@@ -807,7 +875,7 @@ sudo elastic-agent status
 
 In Kibana, go to Fleet > Agents. The Fleet Server should show as "Healthy".
 
-## Step 8: Configure Fleet Server Host in Kibana
+## Step 9: Configure Fleet Server Host in Kibana
 
 1. In Kibana, go to Fleet > Settings
 2. Under "Fleet Server hosts", click "Edit hosts"
@@ -849,7 +917,10 @@ Go to Fleet > Agents. Fleet Server should show "Healthy" with green status.
 After successful deployment:
 
 - Terminate VM0 (staging server) - it is no longer needed
-- Delete `~/airgap-bundle.tar` and `~/airgap-files` from VM1, VM2, VM3 to free disk space
+- Delete bundle files and extracted directories from each VM to free disk space:
+  - VM1: `rm -rf ~/vm1-bundle.tar ~/package-registry-9.2.0.tar ~/downloads ~/docker-debs ~/nginx*.deb ~/libnginx*.deb`
+  - VM2: `rm -rf ~/vm2-bundle.tar ~/*.deb`
+  - VM3: `rm -rf ~/vm3-bundle.tar ~/downloads`
 - Review and tighten Security Group rules as needed
 
 ---
@@ -893,6 +964,30 @@ sudo elastic-agent status
 ```bash
 sudo journalctl -u elastic-agent -f
 ```
+
+## Fleet Server Install Timeout - "Waiting on policy with Fleet Server integration"
+
+If the Fleet Server installation times out with messages like:
+```
+Fleet Server - Waiting on policy with Fleet Server integration: fleet-server-policy
+Error: fleet-server failed: timed out waiting for Fleet Server to start after 2m0s
+```
+
+This means you used the **policy name** instead of the **policy ID**. The `--fleet-server-policy` parameter requires the UUID, not the name.
+
+**Solution:**
+1. In Kibana, go to Fleet > Agent policies
+2. Click on your Fleet Server policy
+3. Copy the policy ID from the browser URL (e.g., `6d72ad6f-2315-4e24-ba27-2bec9ee5de6b`)
+4. Re-run the install command with the UUID:
+   ```bash
+   sudo ./elastic-agent install \
+     --fleet-server-es=https://VM2_PRIVATE_IP:9200 \
+     --fleet-server-service-token=YOUR_TOKEN \
+     --fleet-server-policy=6d72ad6f-2315-4e24-ba27-2bec9ee5de6b \
+     --fleet-server-es-ca=/path/to/ca.crt \
+     --fleet-server-port=8220
+   ```
 
 ## Reset Elasticsearch Password
 

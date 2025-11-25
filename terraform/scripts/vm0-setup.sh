@@ -79,19 +79,47 @@ echo "=== Step 8: Downloading Nginx packages ==="
 cd /home/ubuntu/airgap-files
 apt-get download nginx nginx-common libnginx-mod-http-geoip2 libnginx-mod-http-image-filter libnginx-mod-http-xslt-filter libnginx-mod-mail libnginx-mod-stream libnginx-mod-stream-geoip2 || true
 
-# Step 9: Create archive
-echo "=== Step 9: Creating archive ==="
+# Step 9: Create VM-specific archives
+echo "=== Step 9: Creating VM-specific archives ==="
+cd /home/ubuntu/airgap-files
+
+# VM1 bundle: Package Registry + Artifact downloads + Docker + Nginx
+echo "Creating vm1-bundle.tar (Registries)..."
+tar -cvf /home/ubuntu/vm1-bundle.tar \
+    package-registry-$VERSION.tar \
+    downloads/ \
+    docker-debs/ \
+    nginx*.deb \
+    libnginx*.deb 2>/dev/null || tar -cvf /home/ubuntu/vm1-bundle.tar \
+    package-registry-$VERSION.tar \
+    downloads/ \
+    docker-debs/
+
+# VM2 bundle: Elasticsearch + Kibana only
+echo "Creating vm2-bundle.tar (Elastic Stack)..."
+tar -cvf /home/ubuntu/vm2-bundle.tar \
+    elasticsearch-$VERSION-amd64.deb \
+    elasticsearch-$VERSION-amd64.deb.sha512 \
+    kibana-$VERSION-amd64.deb \
+    kibana-$VERSION-amd64.deb.sha512
+
+# VM3 bundle: Elastic Agent only
+echo "Creating vm3-bundle.tar (Fleet Server)..."
+tar -cvf /home/ubuntu/vm3-bundle.tar \
+    downloads/beats/elastic-agent/
+
 cd /home/ubuntu
-tar -cvf airgap-bundle.tar airgap-files/
-chown ubuntu:ubuntu airgap-bundle.tar
+chown ubuntu:ubuntu vm1-bundle.tar vm2-bundle.tar vm3-bundle.tar
 chown -R ubuntu:ubuntu airgap-files/
 
 echo "=== VM0 Setup Completed at $(date) ==="
 echo ""
-echo "Archive created: /home/ubuntu/airgap-bundle.tar"
-echo "Size: $(ls -lh /home/ubuntu/airgap-bundle.tar | awk '{print $5}')"
+echo "Archives created:"
+echo "  vm1-bundle.tar: $(ls -lh /home/ubuntu/vm1-bundle.tar | awk '{print $5}') (Registries)"
+echo "  vm2-bundle.tar: $(ls -lh /home/ubuntu/vm2-bundle.tar | awk '{print $5}') (Elastic Stack)"
+echo "  vm3-bundle.tar: $(ls -lh /home/ubuntu/vm3-bundle.tar | awk '{print $5}') (Fleet Server)"
 echo ""
-echo "Next step: Transfer airgap-bundle.tar to VM1, VM2, and VM3"
+echo "Next step: Transfer bundles to respective VMs"
 echo "See Part B in the guide for transfer instructions."
 
 # Create completion marker
