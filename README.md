@@ -5,7 +5,7 @@
 ## Overview
 An air-gapped Elastic Security installation requires hosting three critical services locally that would normally be accessed over the internet: the *Elastic Package Registry* (which provides integration packages that Kibana needs to configure data collection), the *Elastic Artifact Registry* (which provides Elastic Agent binaries for installation and upgrades), and optionally the *Elastic Endpoint Artifact Repository* (which provides security artifacts for Elastic Defend). Since the air-gapped network has no internet access, all software packages, Docker images, and binaries must be downloaded on an internet-connected machine and transferred into the environment before installation can begin.
 
-This guide provides instructions in how to deploy Elastic Security with Elastic Agent and self-managed Fleet Server in an air-gapped environment. 
+This guide provides instructions in how to deploy Elastic Security with Elastic Agent and self-managed Fleet Server in an air-gapped environment. It includes the creation of the Artifact and Package Registries.
 
 As an example, a test deployment using AWS EC2 instances is provided.
 
