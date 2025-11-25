@@ -1,11 +1,9 @@
 # Elastic Security Air-Gapped Deployment Guide
 
-Complete Command-by-Command Instructions
-
 ---
 
 ## Overview
-An air-gapped Elastic Security installation requires hosting three critical services locally that would normally be accessed over the internet: the *Elastic Package Registry* (which provides integration packages that Kibana needs to configure data collection), the *Elastic Artifact Registry* (which provides Elastic Agent binaries for installation and upgrades), and optionally the *Elastic Endpoint Artifact Repository* (which provides security artifacts for Elastic Defend). Since the air-gapped network has no internet access, all software packages, Docker images, and binaries must be downloaded on an internet-connected machine and physically transferred into the environment before installation can begin.
+An air-gapped Elastic Security installation requires hosting three critical services locally that would normally be accessed over the internet: the *Elastic Package Registry* (which provides integration packages that Kibana needs to configure data collection), the *Elastic Artifact Registry* (which provides Elastic Agent binaries for installation and upgrades), and optionally the *Elastic Endpoint Artifact Repository* (which provides security artifacts for Elastic Defend). Since the air-gapped network has no internet access, all software packages, Docker images, and binaries must be downloaded on an internet-connected machine and transferred into the environment before installation can begin.
 
 This guide provides instructions in how to deploy Elastic Security with Elastic Agent and self-managed Fleet Server in an air-gapped environment. 
 
@@ -13,9 +11,9 @@ As an example, a test deployment using AWS EC2 instances is provided.
 
 ---
 
-## VM Requirements
+## VM Requirements for test deployment
 
-You need **FOUR** separate VMs to complete this deployment. VM0 is used to download files and can be terminated after transferring files to the air-gapped VMs.
+You need **FOUR** separate VMs to complete the test deployment. VM0 is used to download files and can be terminated after transferring files to the air-gapped VMs.
 
 | VM Name | Purpose | Instance Type | Storage | Internet | Ports |
 |---------|---------|---------------|---------|----------|-------|
@@ -28,7 +26,7 @@ You need **FOUR** separate VMs to complete this deployment. VM0 is used to downl
 
 ---
 
-## AWS Security Group Rules
+### AWS Security Group Rules
 
 Create a Security Group with these inbound rules:
 
